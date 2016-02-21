@@ -3,8 +3,9 @@
 
 # WLS Configuration (will get preferably from env)
 # -------------------------------
-admin_port = int(os.environ.get("ADMIN_PORT", "7001"))
+admin_port = int(os.environ.get("ADMIN_PORT", "8001"))
 admin_pass = os.environ.get("ADMIN_PASSWORD", "welcome01")
+cluster_name = os.environ.get("CLUSTER_NAME", "DockerCluster")
 
 # Open default domain template
 # ======================
@@ -22,6 +23,14 @@ set('LoginTimeoutMillis', 30000)
 cd('/')
 cd('Security/base_domain/User/weblogic')
 cmo.setPassword(admin_pass)
+
+# Define a WebLogic Cluster
+# =========================
+cd('/')
+create(cluster_name, 'Cluster')
+
+cd('/Clusters/' + cluster_name)
+cmo.setClusterMessagingMode('unicast')
 
 # Write the domain and close the domain template
 # ==============================================

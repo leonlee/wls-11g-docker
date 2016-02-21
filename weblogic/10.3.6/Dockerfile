@@ -29,33 +29,37 @@
 
 # Pull base image
 # ---------------
-FROM oraclelinux:7
+FROM registry.shurenyun.com/centos7/base:omega.v0.2
 
 # Maintainer
 # ----------
-MAINTAINER Gilberto Holms <gibaholms85@gmail.com>
+MAINTAINER Li Guoqiang <gqli@dataman-inc.com>
 
 # Environment variables required for this build (do NOT change)
 # -------------------------------------------------------------
-ENV JAVA_RPM jdk-7u79-linux-x64.rpm
+ENV JAVA_PKG jrockit-jdk1.6.0_45-R28.2.7-4.1.0-linux-x64.bin 
 ENV WLS_PKG wls1036_generic.jar
 ENV JAVA_HOME /usr/java/default
+ENV PATH $JAVA_HOME/bin:$PATH
 
 # Setup required packages (unzip), filesystem, and oracle user
 # ------------------------------------------------------------
-RUN mkdir /u01 && \
+RUN umask 027 && \
+    mkdir /u01 && \
     chmod a+xr /u01 && \
     useradd -b /u01 -m -s /bin/bash oracle 
 
 # Copy packages
 COPY $WLS_PKG /u01/
-COPY $JAVA_RPM /u01/
+COPY $JAVA_PKG /u01/
 COPY wls-silent.xml /u01/
+COPY jrk-silent.xml /u01/
 
 # Install and configure Oracle JDK
 # -------------------------------------
-RUN rpm -i /u01/$JAVA_RPM && \ 
-    rm /u01/$JAVA_RPM
+RUN /u01/$JAVA_PKG -mode=silent -silent_xml=/u01/jrk-silent.xml -log=/u01/jdk_install.log && \ 
+    cat /u01/jdk_install.log && \
+    rm /u01/$JAVA_PKG /u01/jrk-silent.xml /u01/jdk_install.log
 
 # Change the open file limits in /etc/security/limits.conf
 RUN sed -i '/.*EOF/d' /etc/security/limits.conf && \
@@ -74,12 +78,26 @@ WORKDIR /u01
 USER oracle
 
 # Installation of WebLogic 
-RUN java -jar $WLS_PKG -mode=silent -silent_xml=/u01/wls-silent.xml && \ 
-	rm $WLS_PKG /u01/wls-silent.xml 
+RUN mkdir /u01/tmp && \
+    java -jar $WLS_PKG -mode=silent -silent_xml=/u01/wls-silent.xml \
+        -log=/u01/server_install.log \
+        -Djava.io.tmpdir=/u01/tmp \
+        -Djava.security.egd=file:/dev/./urandom && \ 
+    cat /u01/server_install.log && \
+	rm -rf /u01/$WLS_PKG \
+        /u01/wls-silent.xml \
+        /u01/server_install.log \
+        /u01/tmp && \
+    export CONFIG_JVM_ARGS="-Djava.security.egd=file:/dev/./urandom" && \
+    export JAVA_OPTIONS=" -Djava.awt.headless=true " && \
+    export DISPLAY=0.0
+
+
+
 
 WORKDIR /u01/oracle/
 
-ENV PATH $PATH:/u01/oracle/weblogic/oracle_common/common/bin
+ENV PATH $PATH:/u01/oracle/weblogic/wlserver_10.3/common/bin
 
 # Define default command to start bash. 
 CMD ["bash"]
